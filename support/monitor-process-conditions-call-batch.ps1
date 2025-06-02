@@ -219,12 +219,12 @@ function Monitor-Processes-Call-Batch {
 		
 		$processEventWatcherQuery = "select * from __instanceOperationEvent within 1 {0}" -f $whereClause
 		try {
-			if (0 -lt $startupCommandLine.Length) {
+			if ($startupCommandLine.Length -gt 0) {
 				Write-Host ("Startup: {0}" -f ($startupCommandLine -join ", "))
 				Start-Process -PassThru -WindowStyle Minimized  -Filepath "cmd.exe" -ArgumentList (@("/C") + $startupCommandLine)
 			}
 			$processEventWatcher = New-Object Management.ManagementEventWatcher $processEventWatcherQuery
-			
+
 			# timeout so we have a gap to detect script closure without waiting for an event.
 			$processEventWatcher.Options.Timeout = New-Object TimeSpan(0, 0, 3)
 
@@ -294,7 +294,7 @@ function Monitor-Processes-Call-Batch {
 				$batchProcessData = $processPIDToBatchCallProcessDataMap[$processPID]
 				Invoke-Command $stopBatchCall -ArgumentList $batchFilepath, $batchProcessData.batchProcessPID, $processPID, $batchProcessData.processName
 			}
-			if (0 -lt $shutdownCommandLine.Length) {
+			if ($shutdownCommandLine.Length -gt 0) {
 				Write-Host ("Shutdown: {0}" -f ($shutdownCommandLine -join ", "))
 				Start-Process -PassThru -WindowStyle Minimized  -Filepath "cmd.exe" -ArgumentList (@("/C") + $shutdownCommandLine)				
 			}
@@ -333,7 +333,7 @@ function Get-TargetInstance-Commandline-Filter{
 		[String]$CommandLineSubstring
 	)
 	if ($PSBoundParameters.ContainsKey('CommandLineSubstring') -And $CommandLineSubstring.Length -gt 0) {
-		return "(targetInstance.CommandLine like'%{0}%')" -f $CommandLineSubstring
+		return "(targetInstance.CommandLine like '%{0}%')" -f $CommandLineSubstring.Replace("*", "%")
 	}
 	return $null
 }
