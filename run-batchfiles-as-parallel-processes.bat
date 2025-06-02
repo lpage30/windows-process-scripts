@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 if "%1" == "" (
 	echo "USAGE: %0 "<batch-command-line-1>" ... "<batch-command-line-N>""
 	echo "Executes batch command-lines 1 - N in parallel via powershell start-processes held by a single job"
-	echo "<batch-command-line>  - should be enclosed in quotes to retain the command followed by any arguments"
+	echo "<batch-command-line>  - of forms `""'<batchfile>''<arg1>''<arg2>''...'""` or `""<batchfile>""`"
 	GOTO :EOF
 )
 set batchFileCmdLines=%1

@@ -25,15 +25,15 @@ param (
 )
 <#
 	convert the following to 2 arrays of arrays
-	$BatchFileCmdLines[0] == '"cmd" "one" "two three four" "three four five"'
-	$BatchFileCmdLines[1] == '"cmd2" "one" "two three four" "three four five"'
+	$BatchFileCmdLines[0] == "'cmd''one''two three four''three four five'"
+	$BatchFileCmdLines[1] == "'cmd2''one''two three four''three four five'"
 	
 	$CommandLines[0] == @('cmd', 'one', 'two three four', 'three four five')
 	$CommandLines[1] == @('cmd2', 'one', 'two three four', 'three four five')
 #>
 [String[][]]$CommandLines = @()
 foreach($batchFileCmdLine in $BatchFileCmdLines) {
-	$cmdLine = (($batchFileCmdLine -Split("`"")) | ForEach-Object {$_.Trim()} | where { $_.Length -gt 0 })
+	$cmdLine = (($batchFileCmdLine -Split("`'")) | ForEach-Object {$_.Trim()} | where { $_.Length -gt 0 })
 	if ($cmdLine -isnot [array]) {
 		$cmdLine = @($cmdLine)
 	}

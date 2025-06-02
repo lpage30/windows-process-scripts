@@ -21,13 +21,13 @@
 		- name  				Win32-Process.Name
 	Batchfile will be called as a new cmd.exe /k Process
 
-.PARAMETER StartupBatchFilepath
-	(optional) Filepath of batch file called before monitoring other services
-	Batchfile will be called as a new cmd.exe /k Process
+.PARAMETER StartupBatchFileCmdLine
+	(optional) Command line to execute before monitoring other services
+	cmdline will be called as a new cmd.exe /k Process
 
-.PARAMETER ShutdownBatchFilepath
-	(optional) Filepath of batch file called after stopping the monitoring other services
-	Batchfile will be called as a new cmd.exe /k Process
+.PARAMETER ShutdownBatchFileCmdLine
+	(optional) Command lines to execute after stopping the monitoring other service
+	cmdlinewill be called as a new cmd.exe /k Process
 
 
 .EXAMPLE
@@ -47,11 +47,11 @@ param (
 	[Parameter(ParameterSetName = 'MonitorProcessConditionsCallBatch',  Mandatory=$true, HelpMessage="Filepath of batch file to call on each process fetch/create")]
 	[String]$BatchFilepath,
 	
-	[Parameter(ParameterSetName = 'MonitorProcessConditionsCallBatch',  HelpMessage="Filepath of batch file called before monitoring other services")]
-	[String]$StartupBatchFilepath,
+	[Parameter(ParameterSetName = 'MonitorProcessConditionsCallBatch',  HelpMessage="Command line to execute before monitoring other services")]
+	[String]$StartupBatchFileCmdLine,
 	
-	[Parameter(ParameterSetName = 'MonitorProcessConditionsCallBatch',  HelpMessage="Filepath of batch file called after stopping the monitoring other services")]
-	[String]$ShutdownBatchFilepath,
+	[Parameter(ParameterSetName = 'MonitorProcessConditionsCallBatch',  HelpMessage="Command lines to execute after stopping the monitoring other services")]
+	[String]$ShutdownBatchFileCmdLine,
 
 	[Parameter(ParameterSetName = 'MonitorProcessConditionsCallBatch',  HelpMessage="formatted date and time: `YYYY_MM_DD.HH_MM_SS` of start of overall session")]
 	[String]$SessionDateTimeString = (Get-Date).toString("yyyy_MM_dd.HH_mm_ss")
@@ -69,11 +69,11 @@ function Main {
 		[Parameter(ParameterSetName = 'Main',  Mandatory=$true, HelpMessage="Filepath of batch file to call on each process fetch/create")]
 		[String]$BatchFilepath,
 
-		[Parameter(ParameterSetName = 'Main',  HelpMessage="Filepath of batch file called before monitoring other services")]
-		[String]$StartupBatchFilepath,
+		[Parameter(ParameterSetName = 'Main',  HelpMessage="Command line to execute before monitoring other services")]
+		[String]$StartupBatchFileCmdLine,
 		
-		[Parameter(ParameterSetName = 'Main',  HelpMessage="Filepath of batch file called after stopping the monitoring other services")]
-		[String]$ShutdownBatchFilepath,
+		[Parameter(ParameterSetName = 'Main',  HelpMessage="Command lines to execute after stopping the monitoring other services")]
+		[String]$ShutdownBatchFileCmdLine,
 
 		[Parameter(ParameterSetName = 'Main',  HelpMessage="formatted date and time: `YYYY_MM_DD.HH_MM_SS` of start of overall session")]
 		[String]$SessionDateTimeString = (Get-Date).toString("yyyy_MM_dd.HH_mm_ss")
@@ -88,7 +88,25 @@ function Main {
 		IF (-not(Test-Path $BatchFilepath)) {
 			throw [System.IO.FileNotFoundException] ("{0} not found." -f $BatchFilepath)
 		}
-		Monitor-Processes-Call-Batch -Condition $conditionAndMessage.condition -ConditionMessage $conditionAndMessage.message -BatchFilepath $BatchFilepath -StartupBatchFilepath $StartupBatchFilepath -ShutdownBatchFilepath $ShutdownBatchFilepath -SessionDateTimeString $SessionDateTimeString
+		[String[]]$startupCmdline = @()
+		[String[]]$shutdownCmdline = @()
+		if (-not([String]::IsNullOrEmpty($StartupBatchFileCmdLine))) {
+			$cmdLine = (($StartupBatchFileCmdLine -Split("`'")) | ForEach-Object {$_.Trim()} | where { $_.Length -gt 0 })
+			if ($cmdLine -isnot [array]) {
+				$cmdLine = @($cmdLine)
+			}
+			$startupCmdline = $cmdLine
+			Write-Host("Parsed StartupCmdLine: {0}  -> [{1}]" -f $StartupBatchFileCmdLine, ($cmdLine -join "|"))
+		}
+		if (-not([String]::IsNullOrEmpty($ShutdownBatchFileCmdLine))) {
+			$cmdLine = (($ShutdownBatchFileCmdLine -Split("`'")) | ForEach-Object {$_.Trim()} | where { $_.Length -gt 0 })
+			if ($cmdLine -isnot [array]) {
+				$cmdLine = @($cmdLine)
+			}
+			$shutdownCmdline = $cmdLine
+			Write-Host("Parsed ShutdownCmdLine: {0}  -> [{1}]" -f $ShutdownBatchFileCmdLine, ($cmdLine -join "|"))
+		}
+		Monitor-Processes-Call-Batch -Condition $conditionAndMessage.condition -ConditionMessage $conditionAndMessage.message -BatchFilepath $BatchFilepath -StartupCmdline $startupCmdline -ShutdownCmdline $shutdownCmdline -SessionDateTimeString $SessionDateTimeString
 
 	} catch {
 		Write-Host ("Exception {0}" -f $_)
@@ -176,11 +194,11 @@ function Monitor-Processes-Call-Batch {
 		[Parameter(ParameterSetName = 'MonitorProcessesCallBatch',  Mandatory=$true, HelpMessage="Filepath of batch file to Start and call")]
 		[String]$BatchFilepath,
 
-		[Parameter(ParameterSetName = 'MonitorProcessesCallBatch',  HelpMessage="Filepath of batch file called before monitoring other services")]
-		[String]$StartupBatchFilepath,
+		[Parameter(ParameterSetName = 'MonitorProcessesCallBatch',  HelpMessage="Command line to execute before monitoring other services")]
+		[String[]]$StartupCmdline,
 		
-		[Parameter(ParameterSetName = 'MonitorProcessesCallBatch',  HelpMessage="Filepath of batch file called after stopping the monitoring other services")]
-		[String]$ShutdownBatchFilepath,
+		[Parameter(ParameterSetName = 'MonitorProcessesCallBatch',  HelpMessage="Command line to execute after stopping the monitoring other services")]
+		[String[]]$ShutdownCmdline,
 
 		[Parameter(ParameterSetName = 'MonitorProcessesCallBatch',  HelpMessage="formatted date and time: `YYYY_MM_DD.HH_MM_SS` of start of overall session")]
 		[String]$SessionDateTimeString = (Get-Date).toString("yyyy_MM_dd.HH_mm_ss")
@@ -188,8 +206,9 @@ function Monitor-Processes-Call-Batch {
 	)
 	$jobName = "MonitorProcessesCallBatch-BackgroundJob"
 	[System.Management.Automation.Job]$job =Start-Job -Name $jobName -ScriptBlock {
-		param($startBatchCallScriptBlock, $stopBatchCallScriptBlock)
-		$startBatchCall = [ScriptBlock]::Create($startBatchCallScriptBlock)
+		param()
+		$startupCommandLine = $using:StartupCmdline
+		$shutdownCommandLine = $using:ShutdownCmdline
 		$stopBatchCall = [ScriptBlock]::Create($stopBatchCallScriptBlock)
 		$whereClause = $using:Condition
 		$whereClauseMessage = $using:ConditionMessage
@@ -197,14 +216,12 @@ function Monitor-Processes-Call-Batch {
 		$sessionDateTimeString = $using:SessionDateTimeString
 		[PSCustomObject]$processPIDToBatchCallProcessDataMap = @{}
 		[PSCustomObject]$batchProcessPIDToBatchCallProcessDataMap = @{}
-		$startupBatchFilepath = $using:StartupBatchFilepath
-		$shutdownBatchFilepath = $using:shutdownBatchFilepath
 		
 		$processEventWatcherQuery = "select * from __instanceOperationEvent within 1 {0}" -f $whereClause
 		try {
-			if (-not([String]::IsNullOrEmpty($startupBatchFilepath)) -And (Test-Path -Path $startupBatchFilepath)) {
-				Write-Host ("Startup: call {0}" -f $startupBatchFilepath)
-				Start-Process -PassThru -WindowStyle Minimized  -Filepath "cmd.exe" -ArgumentList "/C", $startupBatchFilepath, $sessionDateTimeString
+			if (0 -lt $startupCommandLine.Length) {
+				Write-Host ("Startup: {0}" -f ($startupCommandLine -join ", "))
+				Start-Process -PassThru -WindowStyle Minimized  -Filepath "cmd.exe" -ArgumentList (@("/C") + $startupCommandLine)
 			}
 			$processEventWatcher = New-Object Management.ManagementEventWatcher $processEventWatcherQuery
 			
@@ -277,13 +294,13 @@ function Monitor-Processes-Call-Batch {
 				$batchProcessData = $processPIDToBatchCallProcessDataMap[$processPID]
 				Invoke-Command $stopBatchCall -ArgumentList $batchFilepath, $batchProcessData.batchProcessPID, $processPID, $batchProcessData.processName
 			}
-			if (-not([String]::IsNullOrEmpty($shutdownBatchFilepath)) -And (Test-Path -Path $shutdownBatchFilepath)) {
-				Write-Host ("Shutdown: call {0}" -f $shutdownBatchFilepath)
-				Start-Process -PassThru -WindowStyle Minimized  -Filepath "cmd.exe" -ArgumentList "/C", $shutdownBatchFilepath
+			if (0 -lt $shutdownCommandLine.Length) {
+				Write-Host ("Shutdown: {0}" -f ($shutdownCommandLine -join ", "))
+				Start-Process -PassThru -WindowStyle Minimized  -Filepath "cmd.exe" -ArgumentList (@("/C") + $shutdownCommandLine)				
 			}
 			
 		}
-	} -ArgumentList $function:StartBatchCall, $function:StopBatchCall
+	}
 	Receive-Job -Name $jobName -wait -AutoRemove 
 }
 function Get-Executable-Names{
@@ -336,4 +353,4 @@ function Get-TargetInstance-Name-Filter{
 	}
 	return $null
 }
-Main  -UnderDirectory $UnderDirectory -CommandLineSubstring $CommandLineSubstring -BatchFilepath $BatchFilepath -StartupBatchFilepath $StartupBatchFilepath -ShutdownBatchFilepath $ShutdownBatchFilepath -SessionDateTimeString $SessionDateTimeString
+Main  -UnderDirectory $UnderDirectory -CommandLineSubstring $CommandLineSubstring -BatchFilepath $BatchFilepath -StartupBatchFileCmdLine $StartupBatchFileCmdLine -ShutdownBatchFileCmdLine $ShutdownBatchFileCmdLine -SessionDateTimeString $SessionDateTimeString
