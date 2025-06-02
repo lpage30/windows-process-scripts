@@ -206,9 +206,9 @@ function Monitor-Processes-Call-Batch {
 	)
 	$jobName = "MonitorProcessesCallBatch-BackgroundJob"
 	[System.Management.Automation.Job]$job =Start-Job -Name $jobName -ScriptBlock {
-		param()
-		$startupCommandLine = $using:StartupCmdline
-		$shutdownCommandLine = $using:ShutdownCmdline
+		param($startBatchCallScriptBlock, $stopBatchCallScriptBlock)
+		$startBatchCall = [ScriptBlock]::Create($startBatchCallScriptBlock)
+		$stopBatchCall = [ScriptBlock]::Create($stopBatchCallScriptBlock)
 		$stopBatchCall = [ScriptBlock]::Create($stopBatchCallScriptBlock)
 		$whereClause = $using:Condition
 		$whereClauseMessage = $using:ConditionMessage
@@ -216,6 +216,8 @@ function Monitor-Processes-Call-Batch {
 		$sessionDateTimeString = $using:SessionDateTimeString
 		[PSCustomObject]$processPIDToBatchCallProcessDataMap = @{}
 		[PSCustomObject]$batchProcessPIDToBatchCallProcessDataMap = @{}
+		$startupCommandLine = $using:StartupCmdline
+		$shutdownCommandLine = $using:ShutdownCmdline
 		
 		$processEventWatcherQuery = "select * from __instanceOperationEvent within 1 {0}" -f $whereClause
 		try {
@@ -300,7 +302,7 @@ function Monitor-Processes-Call-Batch {
 			}
 			
 		}
-	}
+	} -ArgumentList $function:StartBatchCall, $function:StopBatchCall
 	Receive-Job -Name $jobName -wait -AutoRemove 
 }
 function Get-Executable-Names{
